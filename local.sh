@@ -1,0 +1,1 @@
+go run main.go --kubeconfigPath=/Users/${USER}/.kube/config
