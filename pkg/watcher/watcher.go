@@ -11,20 +11,36 @@ type Watcher interface {
 }
 
 type baseWatcher struct {
-	informer cache.SharedIndexInformer
+	informer  cache.SharedIndexInformer
+	listeners []EventListener
 }
 
-func (w *baseWatcher) Watch(ctx context.Context, onEvent OnEvent) {
+func (w *baseWatcher) Watch(ctx context.Context) {
 	w.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			onEvent(Add, obj)
+			w.notify(Add, obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			onEvent(Update, oldObj, newObj)
+			w.notify(Update, newObj, oldObj)
 		},
 		DeleteFunc: func(obj interface{}) {
-			onEvent(Delete, obj)
+			w.notify(Delete, obj)
 		},
 	})
 	w.informer.Run((ctx.Done()))
+}
+
+func (w *baseWatcher) AddListener(listener EventListener) {
+	if w.listeners == nil {
+		w.listeners = make([]EventListener, 0)
+	}
+	w.listeners = append(w.listeners, listener)
+}
+
+func (w *baseWatcher) notify(event Event, updates ...interface{}) {
+	if w.listeners != nil {
+		for _, lis := range w.listeners {
+			go lis.Update(event, updates...)
+		}
+	}
 }

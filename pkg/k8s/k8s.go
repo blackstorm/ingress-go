@@ -1,12 +1,13 @@
 package k8s
 
 import (
+	"github.com/blackstorm/ingress-go/pkg/common"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func GetClient(kubeconfigPath string) (*kubernetes.Clientset, error) {
+func GetClientWithFeedback(kubeconfigPath string) (*kubernetes.Clientset, error) {
 	var conf *rest.Config
 	var err error
 
@@ -20,4 +21,8 @@ func GetClient(kubeconfigPath string) (*kubernetes.Clientset, error) {
 		return nil, err
 	}
 	return kubernetes.NewForConfig(conf)
+}
+
+func GetClientWithInClusterConfig() (*kubernetes.Clientset, error) {
+	return GetClientWithFeedback(common.EMPTY_STRING)
 }

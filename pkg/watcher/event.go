@@ -9,3 +9,7 @@ const (
 )
 
 type OnEvent func(event Event, updates ...interface{})
+
+type EventListener interface {
+	Update(event Event, updates ...interface{})
+}

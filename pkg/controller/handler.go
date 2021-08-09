@@ -6,8 +6,10 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"sync"
 
 	log "github.com/blackstorm/ingress-go/pkg/logger"
+	"github.com/blackstorm/ingress-go/pkg/watcher"
 	"github.com/sirupsen/logrus"
 	netv1 "k8s.io/api/networking/v1"
 )
@@ -32,10 +34,13 @@ func (rs routes) add(namesapce string, rule netv1.IngressRule) {
 		host := fmt.Sprintf("%s.%s", backend.Service.Name, namesapce)
 		port := backend.Service.Port.Number
 		serviceUrl, _ := url.Parse(fmt.Sprintf("http://%s:%d", host, port))
+
+		// TODO support loadbalance
 		rs[path.Path] = &route{
 			backend:    backend,
 			serviceUrl: serviceUrl,
 		}
+
 		log.InfoWithFields("add route", logrus.Fields{
 			"path":       path.Path,
 			"serviceUrl": serviceUrl.String(),
@@ -65,7 +70,7 @@ func (h hostsRoutes) add(ingress *netv1.Ingress) {
 		// 						port:
 		// 							number: 80
 		if rule.HTTP == nil {
-			log.WarnWithFields("host rule is nil, skip add to route.", logrus.Fields{
+			log.WarnWithFields("host rule is nil, skip add route.", logrus.Fields{
 				"host":      rule.Host,
 				"ingress":   ingress.Name,
 				"namespace": ingress.Namespace,
@@ -86,13 +91,16 @@ func (h hostsRoutes) add(ingress *netv1.Ingress) {
 }
 
 type serverHandler struct {
+	sync.Mutex
 	hostsRoutes hostsRoutes
 }
 
-func newServerHandler() *serverHandler {
-	return &serverHandler{
+func newServerHandler(ingressWatcher *watcher.IngressWatcher) *serverHandler {
+	handler := &serverHandler{
 		hostsRoutes: make(map[string]routes),
 	}
+	ingressWatcher.AddListener(handler)
+	return handler
 }
 
 func (s *serverHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
@@ -109,25 +117,29 @@ func (s *serverHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// 添加 ingress
-func (s *serverHandler) add(ingress *netv1.Ingress) {
-	log.InfoWithFields("add ingress", logrus.Fields{
+func (s *serverHandler) Update(event watcher.Event, updates ...interface{}) {
+	// 并发安全
+	s.Lock()
+	defer s.Unlock()
+
+	ingress := updates[0].(*netv1.Ingress)
+	logFields := logrus.Fields{
 		"ingress":   ingress.Name,
 		"namesapce": ingress.Namespace,
-	})
-	s.hostsRoutes.add(ingress)
-}
+	}
 
-func (s *serverHandler) update(new *netv1.Ingress, old *netv1.Ingress) {
-	log.InfoWithFields("update ingress", logrus.Fields{
-		"ingress":   new.Name,
-		"namesapce": new.Namespace,
-	})
-}
-
-func (c *serverHandler) delete(ingress *netv1.Ingress) {
-	log.InfoWithFields("delete ingress", logrus.Fields{
-		"ingress":   ingress.Name,
-		"namesapce": ingress.Namespace,
-	})
+	switch event {
+	case watcher.Add:
+		log.InfoWithFields("add ingress", logFields)
+		s.hostsRoutes.add(ingress)
+	case watcher.Update:
+		log.InfoWithFields("update ingress", logFields)
+		// old := updates[1].(*netv1.Ingress)
+		// TODO
+	case watcher.Delete:
+		log.InfoWithFields("delete ingress", logFields)
+		// TODO
+	default:
+		log.Warn("unkown event %s", event)
+	}
 }

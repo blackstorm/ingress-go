@@ -2,50 +2,55 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
+	"errors"
+	"fmt"
 	"net/http"
 
+	"github.com/blackstorm/ingress-go/pkg/common"
 	"github.com/blackstorm/ingress-go/pkg/k8s"
 	log "github.com/blackstorm/ingress-go/pkg/logger"
 	"github.com/blackstorm/ingress-go/pkg/watcher"
-	netv1 "k8s.io/api/networking/v1"
 )
 
 func Server(kubeConfPath string) error {
 	log.Info("running ingress controller. kube config path = %s", kubeConfPath)
-	client, err := k8s.GetClient(kubeConfPath)
+	client, err := k8s.GetClientWithFeedback(kubeConfPath)
 	if err != nil {
 		return err
 	}
 
-	watcherEventChannel := newWatcherEventChannel()
-	serverHandler := newServerHandler()
-
-	log.Info("start watch ingress")
+	// init watchers
 	ingressWatcher := watcher.NewIngressWatcher(client)
-	go ingressWatcher.Watch(context.Background(), func(event watcher.Event, updates ...interface{}) {
-		watcherEventChannel.send(ChannelEvent{
-			event:  event,
-			values: updates,
-		})
-	})
+	secretWatcher := watcher.NewSecretWatcher(client)
 
+	// init server handler
+	serverHandler := newServerHandler(ingressWatcher)
+	certificateStore := newCertificateStore()
+
+	// start watch
+	log.Info("start watch ingress")
+	go ingressWatcher.Watch(context.Background())
+	log.Info("start watch sercet")
+	go secretWatcher.Watch(context.Background())
+
+	// start servers
 	go http.ListenAndServe(":8000", serverHandler)
-	go http.ListenAndServe(":8443", serverHandler)
+	go listenAndServeTLS(certificateStore, 8443, serverHandler)
 
-	go watcherEventChannel.listen(func(ce ChannelEvent) {
-		switch ce.event {
-		case watcher.Add:
-			ingress := ce.GetFirst().(*netv1.Ingress)
-			serverHandler.add(ingress)
-		case watcher.Delete:
-			ingress := ce.GetFirst().(*netv1.Ingress)
-			serverHandler.delete(ingress)
-		case watcher.Update:
-			old := ce.GetFirst().(*netv1.Ingress)
-			update := ce.GetLast().(*netv1.Ingress)
-			serverHandler.update(old, update)
-		}
-	})
-
+	// todo
 	return nil
+}
+
+func listenAndServeTLS(certificateStore *certificateStore, port uint, handler *serverHandler) error {
+	tlsServer := http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: handler,
+	}
+	tlsServer.TLSConfig = &tls.Config{
+		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			return nil, errors.New("todo")
+		},
+	}
+	return tlsServer.ListenAndServeTLS(common.EMPTY_STRING, common.EMPTY_STRING)
 }
