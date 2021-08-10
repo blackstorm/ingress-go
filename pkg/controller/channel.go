@@ -15,6 +15,7 @@ func (ce ChannelEvent) GetLast() interface{} {
 	return ce.values[len(ce.values)-1]
 }
 
+/*
 type WatcherEventChannel struct {
 	ch chan ChannelEvent
 }
@@ -36,3 +37,4 @@ func (ec WatcherEventChannel) listen(handler func(ChannelEvent)) {
 		handler(event)
 	}
 }
+*/

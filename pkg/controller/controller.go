@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/blackstorm/ingress-go/pkg/common"
+	"github.com/blackstorm/ingress-go/pkg/getter"
 	"github.com/blackstorm/ingress-go/pkg/k8s"
 	log "github.com/blackstorm/ingress-go/pkg/logger"
 	"github.com/blackstorm/ingress-go/pkg/watcher"
@@ -24,9 +25,12 @@ func Server(kubeConfPath string) error {
 	ingressWatcher := watcher.NewIngressWatcher(client)
 	secretWatcher := watcher.NewSecretWatcher(client)
 
+	// init getters
+	secretGetter := getter.NewSecretGetter(client)
+
 	// init server handler
 	serverHandler := newServerHandler(ingressWatcher)
-	certificateStore := newCertificateStore()
+	certificateStore := newCertificateStore(ingressWatcher, secretWatcher, secretGetter)
 
 	// start watch
 	log.Info("start watch ingress")

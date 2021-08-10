@@ -11,10 +11,10 @@ type SecretWatcher struct {
 	*baseWatcher
 }
 
-func NewSecretWatcher(client kubernetes.Interface) *IngressWatcher {
+func NewSecretWatcher(client kubernetes.Interface) *SecretWatcher {
 	factory := informers.NewSharedInformerFactory(client, time.Minute)
 	informer := factory.Core().V1().Secrets().Informer()
-	return &IngressWatcher{
+	return &SecretWatcher{
 		baseWatcher: &baseWatcher{
 			informer: informer,
 		},
