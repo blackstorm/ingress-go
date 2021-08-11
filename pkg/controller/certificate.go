@@ -2,106 +2,97 @@ package controller
 
 import (
 	"crypto/tls"
-	"reflect"
+	"sync"
 
 	"github.com/blackstorm/ingress-go/pkg/common"
-	"github.com/blackstorm/ingress-go/pkg/getter"
 	log "github.com/blackstorm/ingress-go/pkg/logger"
 	"github.com/blackstorm/ingress-go/pkg/watcher"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	netv1 "k8s.io/api/networking/v1"
 )
 
 type cert struct {
-	// TOOD
+	namespace   string
 	secretName  string
 	certificate *tls.Certificate
 }
 
+type certificateStoreKey string
+
 // TODO is need default certificate
 type certificateStore struct {
-	secretGetter *getter.SecretGetter
-	certs        map[string]*cert
+	sync.Mutex
+	certs map[certificateStoreKey]*cert
 }
 
-func newCertificateStore(
-	ingressWatcher *watcher.IngressWatcher,
-	secretWatcher *watcher.SecretWatcher,
-	secretGetter *getter.SecretGetter) *certificateStore {
-	store := &certificateStore{
-		certs:        make(map[string]*cert),
-		secretGetter: secretGetter,
+func newCertificateStore() *certificateStore {
+	return &certificateStore{
+		certs: make(map[certificateStoreKey]*cert),
 	}
-	ingressWatcher.AddListener(store)
-	secretWatcher.AddListener(store)
-	return store
 }
 
-func (c *certificateStore) Get(sni string) *cert {
-	if cert, ok := c.certs[sni]; ok {
-		return cert
-	} else {
-		return c.certs[common.ToWildcardSni(sni)]
-	}
+func (c *certificateStore) get(key certificateStoreKey) *cert {
+	return c.certs[key]
 }
 
 func (c *certificateStore) Update(event watcher.Event, updates ...interface{}) {
-	update := updates[0]
-	t := reflect.TypeOf(update)
-	switch t {
-	case reflect.TypeOf((*netv1.Ingress)(nil)):
-		c.handleIngressEvent(event, updates...)
-	case reflect.TypeOf((*v1.Secret)(nil)):
-		c.handleSecretEvent(event, updates...)
-	}
+	c.Lock()
+	defer c.Unlock()
+	c.handleEvent(event, updates...)
 }
 
-func (c *certificateStore) handleIngressEvent(event watcher.Event, updates ...interface{}) {
-	switch event {
-	case watcher.Add:
-		ingress := updates[0].(*netv1.Ingress)
-		namesapce := ingress.Namespace
-		for _, tls := range ingress.Spec.TLS {
-			secretName := tls.SecretName
-
-			// init cert
-			cert := &cert{
-				secretName: tls.SecretName,
-			}
-
-			// get certificate
-			if certificate, err := c.getTLSCertificate(namesapce, secretName); err == nil {
-				cert.certificate = certificate
-			} else {
-				log.WarnWithFields("get tls certificate failed", logrus.Fields{
-					"namespace":  namesapce,
-					"secretName": secretName,
-					"error":      err,
-				})
-			}
-
-			// add tls for hosts
-			for _, h := range tls.Hosts {
-				c.certs[h] = cert
-			}
+func (c *certificateStore) handleEvent(event watcher.Event, updates ...interface{}) {
+	secret := updates[0].(*v1.Secret)
+	if secret.Type == "kubernetes.io/tls" {
+		namespace := secret.Namespace
+		secretName := secret.Name
+		log.InfoWithFields("add tls certificate to store", logrus.Fields{
+			"namespace":  namespace,
+			"secretName": secretName,
+		})
+		switch event {
+		case watcher.Add:
+			c.add(namespace, secretName, secret)
+		case watcher.Delete:
+			c.delete(namespace, secretName)
+		case watcher.Update:
+			c.update(namespace, secretName, secret)
 		}
 	}
 }
 
-func (c *certificateStore) handleSecretEvent(event watcher.Event, updates ...interface{}) {
-	// TODO
+func (c *certificateStore) update(ns, name string, secret *v1.Secret) {
+	if certificate, err := common.SecretToTLSCertificate(secret); err != nil {
+		c.certs[c.key(ns, name)].certificate = certificate
+	} else {
+		// TODO log
+	}
 }
 
-func (c *certificateStore) getTLSCertificate(namespace string, secretName string) (*tls.Certificate, error) {
-	// var err error
-	if secret, err := c.secretGetter.Get(namespace, secretName); err == nil {
-		if cert, err := tls.X509KeyPair(secret.Data["tls.crt"], secret.Data["tls.key"]); err == nil {
-			return &cert, nil
-		} else {
-			return nil, err
+func (c *certificateStore) add(ns, name string, secret *v1.Secret) {
+	if certificate, err := common.SecretToTLSCertificate(secret); err != nil {
+		c.certs[c.key(ns, name)] = &cert{
+			namespace:   ns,
+			secretName:  name,
+			certificate: certificate,
 		}
 	} else {
-		return nil, err
+		// TODO log
 	}
+}
+
+// remove certificate just set host cert to nil
+func (c *certificateStore) delete(ns, name string) {
+	key := c.key(ns, name)
+	if cert := c.certs[key]; cert != nil {
+		c.certs[key] = nil
+	}
+}
+
+func (c *certificateStore) key(namespace, secretName string) certificateStoreKey {
+	return buildCertificateStoreKey(namespace, secretName)
+}
+
+func buildCertificateStoreKey(ns, name string) certificateStoreKey {
+	return certificateStoreKey(ns + ":" + name)
 }

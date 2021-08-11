@@ -7,7 +7,7 @@ import (
 )
 
 type Watcher interface {
-	Watch(context.Context, OnEvent) error
+	Watch(context.Context) error
 }
 
 type baseWatcher struct {
