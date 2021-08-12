@@ -7,7 +7,3 @@ const (
 	Update Event = "update"
 	Delete Event = "delete"
 )
-
-type EventListener interface {
-	Update(event Event, updates ...interface{})
-}

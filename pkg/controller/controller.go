@@ -8,8 +8,10 @@ import (
 	"net/http"
 
 	"github.com/blackstorm/ingress-go/pkg/common"
+	"github.com/blackstorm/ingress-go/pkg/controller/matcher"
 	"github.com/blackstorm/ingress-go/pkg/k8s"
 	log "github.com/blackstorm/ingress-go/pkg/logger"
+	"github.com/blackstorm/ingress-go/pkg/store"
 	"github.com/blackstorm/ingress-go/pkg/watcher"
 )
 
@@ -24,9 +26,11 @@ func Server(kubeConfPath string) error {
 	ingressWatcher := watcher.NewIngressWatcher(client)
 	secretWatcher := watcher.NewSecretWatcher(client)
 
+	// init stores
+	certificateStore := store.NewCertificateStore()
+
 	// init matcher
-	matcher := newMatcher()
-	certificateStore := newCertificateStore()
+	matcher := matcher.NewRequestMatcher()
 
 	// add listeners
 	ingressWatcher.AddListener(matcher)
@@ -43,13 +47,13 @@ func Server(kubeConfPath string) error {
 
 	// start servers
 	go http.ListenAndServe(":8000", serverHandler)
-	go listenAndServeTLS(certificateStore, 8443, serverHandler, matcher)
+	go listenAndServeTLS(8443, serverHandler)
 
 	// todo
 	return nil
 }
 
-func listenAndServeTLS(certificateStore *certificateStore, port uint, handler *serverHandler, matcher *matcher) error {
+func listenAndServeTLS(port uint, handler *serverHandler) error {
 	tlsServer := http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
 		Handler: handler,

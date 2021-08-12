@@ -2,20 +2,23 @@ package controller
 
 import (
 	"net/http"
+
+	"github.com/blackstorm/ingress-go/pkg/controller/matcher"
 )
 
 type serverHandler struct {
-	matcher *matcher
+	matcher *matcher.RequestMatcher
 }
 
-func newServerHandler(matcher *matcher) *serverHandler {
-	handler := &serverHandler{
+func newServerHandler(matcher *matcher.RequestMatcher) *serverHandler {
+	return &serverHandler{
 		matcher: matcher,
 	}
-	return handler
 }
 
 func (s *serverHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	resp.Write([]byte("todo"))
+
 	/*
 		host := strings.Split(req.Host, ":")[0]
 		if routes, ok := s.hostsRoutes[host]; !ok {

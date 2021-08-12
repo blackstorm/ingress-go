@@ -37,6 +37,12 @@ func (w *baseWatcher) AddListener(listener EventListener) {
 	w.listeners = append(w.listeners, listener)
 }
 
+func (w *baseWatcher) AddListeners(listeners ...EventListener) {
+	for _, l := range listeners {
+		w.AddListener(l)
+	}
+}
+
 func (w *baseWatcher) notify(event Event, updates ...interface{}) {
 	if w.listeners != nil {
 		for _, lis := range w.listeners {

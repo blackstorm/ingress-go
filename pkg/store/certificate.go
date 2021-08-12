@@ -1,4 +1,4 @@
-package controller
+package store
 
 import (
 	"crypto/tls"
@@ -14,34 +14,34 @@ import (
 type cert struct {
 	namespace   string
 	secretName  string
-	certificate *tls.Certificate
+	Certificate *tls.Certificate
 }
 
-type certificateStoreKey string
+type CertificateStoreKey string
 
 // TODO is need default certificate
-type certificateStore struct {
+type CertificateStore struct {
 	sync.Mutex
-	certs map[certificateStoreKey]*cert
+	certs map[CertificateStoreKey]*cert
 }
 
-func newCertificateStore() *certificateStore {
-	return &certificateStore{
-		certs: make(map[certificateStoreKey]*cert),
+func NewCertificateStore() *CertificateStore {
+	return &CertificateStore{
+		certs: make(map[CertificateStoreKey]*cert),
 	}
 }
 
-func (c *certificateStore) get(key certificateStoreKey) *cert {
+func (c *CertificateStore) Get(key CertificateStoreKey) *cert {
 	return c.certs[key]
 }
 
-func (c *certificateStore) Update(event watcher.Event, updates ...interface{}) {
+func (c *CertificateStore) Update(event watcher.Event, updates ...interface{}) {
 	c.Lock()
 	defer c.Unlock()
 	c.handleEvent(event, updates...)
 }
 
-func (c *certificateStore) handleEvent(event watcher.Event, updates ...interface{}) {
+func (c *CertificateStore) handleEvent(event watcher.Event, updates ...interface{}) {
 	secret := updates[0].(*v1.Secret)
 	if secret.Type == "kubernetes.io/tls" {
 		namespace := secret.Namespace
@@ -61,20 +61,20 @@ func (c *certificateStore) handleEvent(event watcher.Event, updates ...interface
 	}
 }
 
-func (c *certificateStore) update(ns, name string, secret *v1.Secret) {
+func (c *CertificateStore) update(ns, name string, secret *v1.Secret) {
 	if certificate, err := common.SecretToTLSCertificate(secret); err != nil {
-		c.certs[c.key(ns, name)].certificate = certificate
+		c.certs[c.key(ns, name)].Certificate = certificate
 	} else {
 		// TODO log
 	}
 }
 
-func (c *certificateStore) add(ns, name string, secret *v1.Secret) {
+func (c *CertificateStore) add(ns, name string, secret *v1.Secret) {
 	if certificate, err := common.SecretToTLSCertificate(secret); err != nil {
 		c.certs[c.key(ns, name)] = &cert{
 			namespace:   ns,
 			secretName:  name,
-			certificate: certificate,
+			Certificate: certificate,
 		}
 	} else {
 		// TODO log
@@ -82,17 +82,15 @@ func (c *certificateStore) add(ns, name string, secret *v1.Secret) {
 }
 
 // remove certificate just set host cert to nil
-func (c *certificateStore) delete(ns, name string) {
+func (c *CertificateStore) delete(ns, name string) {
 	key := c.key(ns, name)
-	if cert := c.certs[key]; cert != nil {
-		c.certs[key] = nil
-	}
+	delete(c.certs, key)
 }
 
-func (c *certificateStore) key(namespace, secretName string) certificateStoreKey {
-	return buildCertificateStoreKey(namespace, secretName)
+func (c *CertificateStore) key(namespace, secretName string) CertificateStoreKey {
+	return BuildCertificateStoreKey(namespace, secretName)
 }
 
-func buildCertificateStoreKey(ns, name string) certificateStoreKey {
-	return certificateStoreKey(ns + ":" + name)
+func BuildCertificateStoreKey(ns, name string) CertificateStoreKey {
+	return CertificateStoreKey(ns + ":" + name)
 }
