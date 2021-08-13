@@ -3,23 +3,32 @@ package main
 import (
 	"flag"
 
-	"github.com/blackstorm/ingress-go/pkg/common"
+	banner "github.com/blackstorm/ingress-go/pkg/banner"
 	ctl "github.com/blackstorm/ingress-go/pkg/controller"
-	log "github.com/blackstorm/ingress-go/pkg/logger"
+	"github.com/blackstorm/ingress-go/pkg/k8s"
+	"k8s.io/klog/v2"
 )
 
 func main() {
-	log.Info("fast ingress controller.")
-
+	isHiddenBanner := flag.Bool("hiddenBanner", false, "dont print banner")
 	kubeConfPath := flag.String("kubeconfigPath", "", "kube config path")
 	flag.Parse()
 
-	signal := make(chan bool)
+	banner.Print(isHiddenBanner)
 
-	err := ctl.Server(common.CheckOrDefault(kubeConfPath, common.EMPTY_STRING))
+	// get kubernetes client
+	client, err := k8s.GetClient(kubeConfPath)
 	if err != nil {
 		panic(err)
 	}
 
+	klog.Info("ingress-go")
+
+	// run server
+	signal := make(chan bool)
+	err = ctl.Server(client)
+	if err != nil {
+		panic(err)
+	}
 	<-signal
 }

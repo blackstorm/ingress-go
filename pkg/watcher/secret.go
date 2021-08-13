@@ -16,6 +16,7 @@ func NewSecretWatcher(client kubernetes.Interface) *SecretWatcher {
 	informer := factory.Core().V1().Secrets().Informer()
 	return &SecretWatcher{
 		baseWatcher: &baseWatcher{
+			name:     "secrets",
 			informer: informer,
 		},
 	}

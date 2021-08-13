@@ -16,6 +16,7 @@ func NewIngressWatcher(client kubernetes.Interface) *IngressWatcher {
 	informer := factory.Networking().V1().Ingresses().Informer()
 	return &IngressWatcher{
 		baseWatcher: &baseWatcher{
+			name:     "ingresses",
 			informer: informer,
 		},
 	}

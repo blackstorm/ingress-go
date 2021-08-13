@@ -4,18 +4,21 @@ import (
 	"context"
 
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 )
 
 type Watcher interface {
-	Watch(context.Context) error
+	Watch(context.Context)
 }
 
 type baseWatcher struct {
+	name      string
 	informer  cache.SharedIndexInformer
 	listeners []EventListener
 }
 
 func (w *baseWatcher) Watch(ctx context.Context) {
+	klog.Infof("watching %s", w.name)
 	w.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			w.notify(Add, obj)
@@ -32,9 +35,11 @@ func (w *baseWatcher) Watch(ctx context.Context) {
 
 func (w *baseWatcher) AddListener(listener EventListener) {
 	if w.listeners == nil {
-		w.listeners = make([]EventListener, 0)
+		w.listeners = make([]EventListener, 1)
+		w.listeners[0] = listener
+	} else {
+		w.listeners = append(w.listeners, listener)
 	}
-	w.listeners = append(w.listeners, listener)
 }
 
 func (w *baseWatcher) AddListeners(listeners ...EventListener) {

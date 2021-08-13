@@ -9,22 +9,14 @@ import (
 
 	"github.com/blackstorm/ingress-go/pkg/common"
 	"github.com/blackstorm/ingress-go/pkg/controller/matcher"
-	"github.com/blackstorm/ingress-go/pkg/k8s"
-	log "github.com/blackstorm/ingress-go/pkg/logger"
 	"github.com/blackstorm/ingress-go/pkg/store"
 	"github.com/blackstorm/ingress-go/pkg/watcher"
+	"k8s.io/client-go/kubernetes"
 )
 
-func Server(kubeConfPath string) error {
-	log.Info("running ingress controller. kube config path = %s", kubeConfPath)
-	client, err := k8s.GetClientWithFeedback(kubeConfPath)
-	if err != nil {
-		return err
-	}
-
+func Server(client kubernetes.Interface) error {
 	// init watchers
-	ingressWatcher := watcher.NewIngressWatcher(client)
-	secretWatcher := watcher.NewSecretWatcher(client)
+	ingressWatcher, secretWatcher := newWatchers(client)
 
 	// init stores
 	certificateStore := store.NewCertificateStore()
@@ -40,10 +32,7 @@ func Server(kubeConfPath string) error {
 	serverHandler := newServerHandler(matcher)
 
 	// start watch
-	log.Info("start watch sercet")
-	go secretWatcher.Watch(context.Background())
-	log.Info("start watch ingress")
-	ingressWatcher.Watch(context.Background())
+	runWatchers(context.Background(), ingressWatcher, secretWatcher)
 
 	// start servers
 	go http.ListenAndServe(":8000", serverHandler)
@@ -64,4 +53,14 @@ func listenAndServeTLS(port uint, handler *serverHandler) error {
 		},
 	}
 	return tlsServer.ListenAndServeTLS(common.EMPTY_STRING, common.EMPTY_STRING)
+}
+
+func newWatchers(client kubernetes.Interface) (*watcher.IngressWatcher, *watcher.SecretWatcher) {
+	return watcher.NewIngressWatcher(client), watcher.NewSecretWatcher(client)
+}
+
+func runWatchers(ctx context.Context, watchers ...watcher.Watcher) {
+	for _, watcher := range watchers {
+		go watcher.Watch(ctx)
+	}
 }

@@ -4,20 +4,21 @@ import (
 	"net/http"
 	"strings"
 
+	convert "github.com/blackstorm/ingress-go/pkg/k8s/api/convert"
 	"github.com/blackstorm/ingress-go/pkg/watcher"
 	netv1 "k8s.io/api/networking/v1"
+	"k8s.io/klog/v2"
 )
 
 type RequestMatcher struct {
-	routerMatcher *RouterMatcher
-	hostMatcher   *HostMatcher
-	watcher.BaseIngressEventListener
+	hostPathMatcher map[string]*PathMatcher
+	hostMatcher     *HostMatcher
 }
 
 func NewRequestMatcher() *RequestMatcher {
 	return &RequestMatcher{
-		hostMatcher:   NewHostMatcher(),
-		routerMatcher: NewRouterMatcher(),
+		hostPathMatcher: make(map[string]*PathMatcher),
+		hostMatcher:     newHostMatcher(),
 	}
 }
 
@@ -29,7 +30,8 @@ func (m *RequestMatcher) Match(req *http.Request) {
 	}
 }
 
-func (m *RequestMatcher) OnUpdate(event watcher.Event, updates ...*netv1.Ingress) {
+func (m *RequestMatcher) Update(event watcher.Event, values ...interface{}) {
+	updates := convert.Ingresses(values...)
 	// TODO lock
 	switch event {
 	case watcher.Add:
@@ -43,12 +45,24 @@ func (m *RequestMatcher) OnUpdate(event watcher.Event, updates ...*netv1.Ingress
 
 // 使用 label 删除 path 和 route
 func (m *RequestMatcher) add(ingress *netv1.Ingress) {
-	name := ingress.Name
-	namespace := ingress.Namespace
+	klog.Info("add ingress ", klog.KObj(ingress))
 	for _, rule := range ingress.Spec.Rules {
-		host := NewHost(rule.Host, namespace, name)
+		h := rule.Host
+
+		host := newHost(h, ingress)
 
 		m.hostMatcher.add(host)
-		m.routerMatcher.add(rule, host)
+
+		var ok bool
+		var matcher *PathMatcher
+
+		matcher, ok = m.hostPathMatcher[h]
+		if !ok {
+			matcher = newPathMatcher()
+			m.hostPathMatcher[h] = matcher
+		}
+
+		// add and label
+		matcher.add(ingress, rule, host)
 	}
 }

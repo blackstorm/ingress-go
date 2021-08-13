@@ -2,12 +2,17 @@ package looger
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	logrus.SetFormatter(&logrus.JSONFormatter{})
+	formatter := &logrus.TextFormatter{
+		FullTimestamp: true,
+	}
+	logrus.SetFormatter(formatter)
+	logrus.SetOutput(os.Stdout)
 }
 
 func Info(message string, values ...interface{}) {
