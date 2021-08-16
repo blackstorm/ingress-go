@@ -1,15 +1,22 @@
 package common
 
-import "strings"
+const wildcard = '*'
+const wildcardStr = "*"
 
 func ToWildcardSni(sni string) string {
-	var sb strings.Builder
+	if len(sni) == 0 {
+		return wildcardStr
+	}
+
+	if sni[0] == wildcard {
+		return sni
+	}
+
 	for i, c := range sni {
 		if c == '.' {
-			sb.WriteString("*")
-			sb.WriteString(sni[i:])
-			break
+			return wildcardStr + sni[i:]
 		}
 	}
-	return sb.String()
+
+	return wildcardStr
 }

@@ -11,10 +11,20 @@ type Watcher interface {
 	Watch(context.Context)
 }
 
+type channelEvent struct {
+	event   Event
+	updates []interface{}
+}
+
+type channelEventListener struct {
+	ch       chan channelEvent
+	listener EventListener
+}
+
 type baseWatcher struct {
 	name      string
 	informer  cache.SharedIndexInformer
-	listeners []EventListener
+	listeners []channelEventListener
 }
 
 func (w *baseWatcher) Watch(ctx context.Context) {
@@ -34,12 +44,25 @@ func (w *baseWatcher) Watch(ctx context.Context) {
 }
 
 func (w *baseWatcher) AddListener(listener EventListener) {
-	if w.listeners == nil {
-		w.listeners = make([]EventListener, 1)
-		w.listeners[0] = listener
-	} else {
-		w.listeners = append(w.listeners, listener)
+	cl := channelEventListener{
+		ch:       make(chan channelEvent),
+		listener: listener,
 	}
+
+	if w.listeners == nil {
+		w.listeners = make([]channelEventListener, 1)
+		w.listeners[0] = cl
+	} else {
+		w.listeners = append(w.listeners, cl)
+	}
+
+	listen := func(l channelEventListener) {
+		event := <-l.ch
+		l.listener.Update(event.event, event.updates...)
+	}
+
+	// listen channel and send event to channel
+	go listen(cl)
 }
 
 func (w *baseWatcher) AddListeners(listeners ...EventListener) {
@@ -48,10 +71,21 @@ func (w *baseWatcher) AddListeners(listeners ...EventListener) {
 	}
 }
 
+// notify func support publish event to channel
 func (w *baseWatcher) notify(event Event, updates ...interface{}) {
+	chEvent := channelEvent{
+		event:   event,
+		updates: updates,
+	}
+
+	publish := func(l channelEventListener, event channelEvent) {
+		l.ch <- event
+	}
+
 	if w.listeners != nil {
-		for _, lis := range w.listeners {
-			go lis.Update(event, updates...)
+		for _, l := range w.listeners {
+			go publish(l, chEvent)
+			// go lis.Update(event, updates...)
 		}
 	}
 }

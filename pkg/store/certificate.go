@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"sync"
 
-	"github.com/blackstorm/ingress-go/pkg/common"
+	"github.com/blackstorm/ingress-go/pkg/k8s"
 	log "github.com/blackstorm/ingress-go/pkg/logger"
 	"github.com/blackstorm/ingress-go/pkg/watcher"
 	"github.com/sirupsen/logrus"
@@ -62,7 +62,7 @@ func (c *CertificateStore) handleEvent(event watcher.Event, updates ...interface
 }
 
 func (c *CertificateStore) update(ns, name string, secret *v1.Secret) {
-	if certificate, err := common.SecretToTLSCertificate(secret); err != nil {
+	if certificate, err := k8s.SecretToTLSCertificate(secret); err != nil {
 		c.certs[c.key(ns, name)].Certificate = certificate
 	} else {
 		// TODO log
@@ -70,7 +70,7 @@ func (c *CertificateStore) update(ns, name string, secret *v1.Secret) {
 }
 
 func (c *CertificateStore) add(ns, name string, secret *v1.Secret) {
-	if certificate, err := common.SecretToTLSCertificate(secret); err != nil {
+	if certificate, err := k8s.SecretToTLSCertificate(secret); err != nil {
 		c.certs[c.key(ns, name)] = &cert{
 			namespace:   ns,
 			secretName:  name,

@@ -1,4 +1,4 @@
-package common
+package k8s
 
 import (
 	"crypto/tls"
