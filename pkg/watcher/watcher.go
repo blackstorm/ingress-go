@@ -56,12 +56,13 @@ func (w *baseWatcher) AddListener(listener EventListener) {
 		w.listeners = append(w.listeners, cl)
 	}
 
+	// listen update channel and send event to the channel
 	listen := func(l channelEventListener) {
-		event := <-l.ch
-		l.listener.Update(event.event, event.updates...)
+		for {
+			event := <-l.ch
+			l.listener.Update(event.event, event.updates...)
+		}
 	}
-
-	// listen channel and send event to channel
 	go listen(cl)
 }
 
@@ -85,7 +86,6 @@ func (w *baseWatcher) notify(event Event, updates ...interface{}) {
 	if w.listeners != nil {
 		for _, l := range w.listeners {
 			go publish(l, chEvent)
-			// go lis.Update(event, updates...)
 		}
 	}
 }
