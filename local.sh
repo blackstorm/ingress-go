@@ -1,1 +1,1 @@
-go run main.go --kubeconfigPath=/Users/${USER}/.kube/config
+go run main.go --kubeconfigPath=/Users/${USER}/.kube/config -defaultCertFile=./rootfs/etc/ingress-go/default.crt -defaultKeyFile=./rootfs/etc/ingress-go/default.key

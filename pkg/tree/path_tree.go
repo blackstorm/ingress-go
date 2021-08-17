@@ -25,9 +25,7 @@ func newPathTree(value interface{}) *PathTree {
 }
 
 func (t *PathTree) Put(path string, value interface{}) interface{} {
-	if path[0] == '/' {
-		path = path[1:]
-	}
+	path = headLessPath(path)
 	paths := strings.Split(path, "/")
 	return t.put(paths, value, t.children)
 }
@@ -55,9 +53,7 @@ func (t *PathTree) put(paths []string, value interface{}, tree map[string]*PathT
 }
 
 func (m *PathTree) Match(path string) interface{} {
-	if path[0] == '/' {
-		path = path[1:]
-	}
+	path = headLessPath(path)
 	paths := strings.Split(path, "/")
 	return m.match(paths, m.children, nil)
 }
@@ -87,4 +83,11 @@ func (m *PathTree) match(paths []string, tree map[string]*PathTree, best interfa
 		return best
 	}
 	return res
+}
+
+func headLessPath(path string) string {
+	if path[0] == '/' {
+		return path[1:]
+	}
+	return path
 }

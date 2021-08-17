@@ -10,6 +10,8 @@ import (
 )
 
 func main() {
+	defaultCertFile := flag.String("defaultCertFile", "/etc/ingress-go/default.crt", "the server default certificate")
+	defaultKeyFile := flag.String("defaultKeyFile", "/etc/ingress-go/default.key", "the server default certificate key")
 	isHiddenBanner := flag.Bool("hiddenBanner", false, "dont print banner")
 	kubeConfPath := flag.String("kubeconfigPath", "", "kube config path")
 	flag.Parse()
@@ -26,7 +28,7 @@ func main() {
 
 	// run server
 	signal := make(chan bool)
-	err = ctl.Server(client)
+	err = ctl.Server(client, ctl.NewDefaultCertificate(defaultCertFile, defaultKeyFile))
 	if err != nil {
 		panic(err)
 	}
