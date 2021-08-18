@@ -67,28 +67,17 @@ func (t *PathTree) PrefixMatch(path string) interface{} {
 }
 
 func (t *PathTree) prefixMatch(paths []string) interface{} {
-	length := len(paths)
-
-	if length == 1 {
+	if len(paths) == 1 {
 		return t.value
 	}
 
-	tree := t
-	best := t.value
-
-	for i := 1; i < len(paths); i++ {
-		path := paths[i]
-		if tree.children != nil {
-			if sub, ok := t.children[path]; ok {
-				tree = sub
-				best = tree.value
-				continue
-			}
+	if tree := t.children[paths[1]]; tree != nil {
+		if res := tree.prefixMatch(paths[1:]); res != nil {
+			return res
 		}
-		break
 	}
 
-	return best
+	return t.value
 }
 
 func (m *PathTree) Delete(path string) {

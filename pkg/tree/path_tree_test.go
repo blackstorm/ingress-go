@@ -18,78 +18,40 @@ func TestPathTree(t *testing.T) {
 func TestPathTreePrefixMatch(t *testing.T) {
 	tree := NewPathTree()
 
-	root := "/"
-	value := make(chan int)
-	tree.Put(root, value)
-
 	test := "/test/demo"
-	value2 := make(chan int)
+	value2 := "test"
 	tree.Put(test, value2)
 
 	test3 := "/test/demo/name"
-	value3 := make(chan int)
+	value3 := "test3"
 	tree.Put(test3, value3)
 
 	if tree.PrefixMatch(test) != value2 {
 		t.Fatalf("error prefixMatch")
 	}
-}
 
-/*
-func TestPathTreeMatch(t *testing.T) {
-	root := NewPathTree()
-
-	path := "/test/demo"
-	value := make(chan int)
-	root.Put(path, value)
-
-	path2 := "/test/dem1o"
-	value2 := make(chan int)
-	root.Put(path2, value2)
-
-	v := root.Match(path)
-	if v == nil {
-		t.Fatalf("no found path")
-	} else {
-		if v != value {
-			t.Fatalf("value not match")
-		}
+	if tree.PrefixMatch(test+"/123213/sadasd") != value2 {
+		t.Fatalf("error prefixMatch")
 	}
 
-	v = root.Match(path2)
-	if v == nil {
-		t.Fatalf("no found path2")
-	} else {
-		if v != value2 {
-			t.Fatalf("value2 not match")
-		}
+	if tree.PrefixMatch(test3) != value3 {
+		t.Fatalf("error prefixMatch")
 	}
-}
 
-func TestPathTreeDelete(t *testing.T) {
-	root := NewPathTree()
+	if tree.PrefixMatch(test3+"/asdasd/asdasd/asdasda") != value3 {
+		t.Fatalf("error prefixMatch")
+	}
 
-	path := "/test/demo"
-	value := make(chan int)
-	root.Put(path, value)
+	if tree.PrefixMatch("/") != nil {
+		t.Fatalf("error prefixMatch")
+	}
 
-	path2 := "/test/demo1"
-	value2 := make(chan int)
-	root.Put(path2, value2)
+	if tree.PrefixMatch("/test") != nil {
+		t.Fatalf("error prefixMatch")
+	}
 
-	path3 := "/test/demo2"
-	value3 := make(chan int)
-	root.Put(path3, value3)
-
-	path4 := "/test/demo3"
-	value4 := make(chan int)
-	root.Put(path4, value4)
-
-	root.Delete("/test/demo2")
-
-	if v := root.Match("/test/demo2"); v != nil {
-		t.Fatalf("delete failed")
+	if tree.PrefixMatch("/asd/testss") != nil {
+		t.Fatalf("error prefixMatch")
 	}
 
 }
-*/
