@@ -8,33 +8,24 @@ import (
 	"github.com/blackstorm/ingress-go/pkg/store"
 	"github.com/blackstorm/ingress-go/pkg/watcher"
 	netv1 "k8s.io/api/networking/v1"
+	"k8s.io/klog/v2"
 )
 
-type tlsSpec struct {
-	storeKey store.CertificateStoreKey
-}
-
-func newTlsSpec(namespace, secretName string) *tlsSpec {
-	return &tlsSpec{
-		storeKey: store.BuildCertificateStoreKey(namespace, secretName),
-	}
-}
-
 type TLSMatcher struct {
-	store        *store.CertificateStore
-	hostTlsSpecs map[string]*tlsSpec
+	store            *store.CertificateStore
+	hostTlsStoreKeys map[string]store.CertificateStoreKey
 }
 
-func NewTLSMatcher(store *store.CertificateStore) *TLSMatcher {
+func NewTLSMatcher(s *store.CertificateStore) *TLSMatcher {
 	return &TLSMatcher{
-		store:        store,
-		hostTlsSpecs: make(map[string]*tlsSpec),
+		store:            s,
+		hostTlsStoreKeys: make(map[string]store.CertificateStoreKey),
 	}
 }
 
 func (m *TLSMatcher) Match(sni string, wildcard bool) *tls.Certificate {
-	if spec, ok := m.hostTlsSpecs[sni]; ok {
-		cert := m.store.Get(spec.storeKey)
+	if key, ok := m.hostTlsStoreKeys[sni]; ok {
+		cert := m.store.Get(key)
 		if cert != nil {
 			return cert
 		}
@@ -52,15 +43,43 @@ func (m *TLSMatcher) Update(event watcher.Event, updates ...interface{}) {
 	switch event {
 	case watcher.Add:
 		m.add(ingresses[0])
+	case watcher.Update:
+		// delete old
+		m.delete(ingresses[1])
+		// add new
+		m.add(ingresses[0])
+	case watcher.Delete:
+		m.delete(ingresses[0])
 	}
 }
 
+// TODO If two ingress or more has same host but diffent tls??
 func (m *TLSMatcher) add(ingress *netv1.Ingress) {
 	for _, tls := range ingress.Spec.TLS {
-		spec := newTlsSpec(ingress.Namespace, tls.SecretName)
+
+		// check tls secret is defined
+		if tls.SecretName == "" {
+			klog.Warningf("tls %s SecretName not defined %s", tls.Hosts, klog.KObj(ingress))
+			continue
+		}
+
+		key := store.BuildCertificateStoreKey(ingress.Namespace, tls.SecretName)
 		for _, host := range tls.Hosts {
 			// klog.Infof("register host %s tls spec %s", host, spec.storeKey)
-			m.hostTlsSpecs[host] = spec
+			m.hostTlsStoreKeys[host] = key
+		}
+	}
+}
+
+func (m *TLSMatcher) delete(ingress *netv1.Ingress) {
+	for _, tls := range ingress.Spec.TLS {
+		key := store.BuildCertificateStoreKey(ingress.Namespace, tls.SecretName)
+		for _, host := range tls.Hosts {
+			if k, ok := m.hostTlsStoreKeys[host]; ok {
+				if k == key {
+					delete(m.hostTlsStoreKeys, host)
+				}
+			}
 		}
 	}
 }

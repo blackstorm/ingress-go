@@ -17,8 +17,9 @@ func newServerHandler(matcher *matcher.RequestMatcher) *serverHandler {
 }
 
 func (s *serverHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	// the head support for test
+	resp.Header().Add("alt-svc", "quic=\":443\"; ma=2592000; v=\"39\"")
 	resp.Write([]byte("todo"))
-
 	/*
 		host := strings.Split(req.Host, ":")[0]
 		if routes, ok := s.hostsRoutes[host]; !ok {

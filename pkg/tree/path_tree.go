@@ -17,77 +17,80 @@ func NewPathTree() *PathTree {
 	}
 }
 
-func newPathTree(value interface{}) *PathTree {
+func newPathTree() *PathTree {
 	return &PathTree{
-		value:    value,
 		children: make(map[string]*PathTree),
 	}
 }
 
+func treePaths(path string) []string {
+	length := len(path)
+
+	if length == 0 || path == "/" {
+		return []string{""}
+	}
+
+	if path[0] != '/' {
+		path = "/" + path
+		length++
+	}
+
+	if path[length-1] == '/' {
+		path = path[:length-1]
+	}
+
+	return strings.Split(path, "/")
+}
+
 func (t *PathTree) Put(path string, value interface{}) interface{} {
-	path = headLessPath(path)
-	paths := strings.Split(path, "/")
-	return t.put(paths, value, t.children)
+	return t.put(treePaths(path), value)
 }
 
-func (t *PathTree) put(paths []string, value interface{}, tree map[string]*PathTree) interface{} {
-	isLast := len(paths) == 1
-	root := paths[0]
-
-	var node *PathTree
-	var ok bool
-	node, ok = tree[root]
-
-	if !ok {
-		node = newPathTree(nil)
-		tree[root] = node
+func (t *PathTree) put(paths []string, value interface{}) interface{} {
+	// return recursion
+	if len(paths) == 1 {
+		oldValue := t.value
+		t.value = value
+		return oldValue
 	}
 
-	if isLast {
-		nodeOldValue := node.value
-		node.value = value
-		return nodeOldValue
+	subPath := paths[1]
+	if t.children[subPath] == nil {
+		t.children[subPath] = newPathTree()
 	}
 
-	return t.put(paths[1:], value, node.children)
+	return t.children[subPath].put(paths[1:], value)
 }
 
-func (m *PathTree) Match(path string) interface{} {
-	path = headLessPath(path)
-	paths := strings.Split(path, "/")
-	return m.match(paths, m.children, nil)
+func (t *PathTree) PrefixMatch(path string) interface{} {
+	return t.prefixMatch(treePaths(path))
 }
 
-func (m *PathTree) match(paths []string, tree map[string]*PathTree, best interface{}) interface{} {
-	if tree == nil {
-		return nil
+func (t *PathTree) prefixMatch(paths []string) interface{} {
+	length := len(paths)
+
+	if length == 1 {
+		return t.value
 	}
 
-	root := paths[0]
-	isLast := len(paths) == 1
+	tree := t
+	best := t.value
 
-	var node *PathTree
-	var ok bool
-	node, ok = tree[root]
-
-	if isLast {
-		if ok {
-			return node.value
-		} else {
-			return nil
+	for i := 1; i < len(paths); i++ {
+		path := paths[i]
+		if tree.children != nil {
+			if sub, ok := t.children[path]; ok {
+				tree = sub
+				best = tree.value
+				continue
+			}
 		}
+		break
 	}
 
-	res := m.match(paths[1:], node.children, node.value)
-	if res == nil {
-		return best
-	}
-	return res
+	return best
 }
 
-func headLessPath(path string) string {
-	if path[0] == '/' {
-		return path[1:]
-	}
-	return path
+func (m *PathTree) Delete(path string) {
+
 }

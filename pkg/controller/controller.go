@@ -37,6 +37,7 @@ func Server(client kubernetes.Interface, defaultCert DefaultCertificate) error {
 	// start servers
 	go http.ListenAndServe(":80", serverHandler)
 	go listenAndServeTLS(443, serverHandler, tlsMatcher, defaultCert)
+	go listenAndServeHttp3(serverHandler, defaultCert)
 
 	// todo
 	return nil

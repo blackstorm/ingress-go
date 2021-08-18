@@ -12,7 +12,7 @@ import (
 
 type RequestMatcher struct {
 	hostPathMatcher map[string]*PathMatcher
-	hostMatcher     *HostMatcher
+	hostMatcher     HostMatcher
 }
 
 func NewRequestMatcher() *RequestMatcher {
@@ -37,9 +37,9 @@ func (m *RequestMatcher) Update(event watcher.Event, values ...interface{}) {
 	case watcher.Add:
 		m.add(updates[0])
 	case watcher.Update:
-		// TODO
+		m.update(updates[0], updates[1])
 	case watcher.Delete:
-		// TODO
+		m.delete(updates[0])
 	}
 }
 
@@ -64,5 +64,21 @@ func (m *RequestMatcher) add(ingress *netv1.Ingress) {
 
 		// add and label
 		matcher.add(ingress, rule, host)
+	}
+}
+
+func (m *RequestMatcher) update(new, old *netv1.Ingress) {
+	klog.Info("update ingress ", klog.KObj(new))
+	m.delete(old)
+	m.add(new)
+}
+
+func (m *RequestMatcher) delete(ingress *netv1.Ingress) {
+	klog.Info("delete ingress ", klog.KObj(ingress))
+	for _, rule := range ingress.Spec.Rules {
+		m.hostMatcher.delete(newHost(rule.Host, ingress))
+		if _, ok := m.hostPathMatcher[rule.Host]; ok {
+			// TODO
+		}
 	}
 }

@@ -2,8 +2,6 @@ package label
 
 import (
 	"strings"
-
-	"k8s.io/klog/v2"
 )
 
 type Resource interface {
@@ -41,14 +39,4 @@ func (l BaseLabeler) Equals(labeler Labeler) bool {
 		return false
 	}
 	return strings.Compare(l.LabelName, labeler.GetLabelName()) == 0
-}
-
-func LabelResources(labeler Labeler, resources []Resource) {
-	if labeler != nil && len(resources) > 0 {
-		for _, resource := range resources {
-			labeler.Label(resource)
-		}
-	} else {
-		klog.Warningf("label resource labeler is %v and resources lens %d", labeler, len(resources))
-	}
 }

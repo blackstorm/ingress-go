@@ -5,6 +5,7 @@ import (
 
 	"github.com/blackstorm/ingress-go/pkg/controller/label"
 	netv1 "k8s.io/api/networking/v1"
+	"k8s.io/klog/v2"
 )
 
 type Host struct {
@@ -21,26 +22,37 @@ func newHost(host string, ingress *netv1.Ingress) Host {
 	}
 }
 
-type HostMatcher struct {
-	hosts map[string][]Host
+type HostMatcher map[string]*linkedHost
+
+func newHostMatcher() HostMatcher {
+	return make(HostMatcher)
 }
 
-func newHostMatcher() *HostMatcher {
-	return &HostMatcher{
-		hosts: make(map[string][]Host),
+func (m HostMatcher) match(host string) bool {
+	linked, ok := m[host]
+	return ok && linked != nil
+}
+
+func (m HostMatcher) add(host Host) {
+	if linked, ok := m[host.host]; ok {
+		if linked.find(host) != nil {
+			klog.Infof("host %s existed skip add", host.host)
+		} else {
+			klog.Infof("add host %s to matcher", host.host)
+			linked.append(&host)
+		}
+	} else {
+		klog.Infof("add host %s to matcher", host.host)
+		m[host.host] = newLinkedHost(&host)
 	}
 }
 
-func (m *HostMatcher) match(host string) bool {
-	_, ok := m.hosts[host]
-	return ok
-}
-
-func (m *HostMatcher) add(host Host) {
-	var hs []Host
-	if hs = m.hosts[host.host]; hs == nil {
-		hs = make([]Host, 1)
+func (m HostMatcher) delete(host Host) {
+	if linked, ok := m[host.host]; ok {
+		if res := linked.find(host); res != nil {
+			if res.remove() == -1 {
+				m[host.host] = nil
+			}
+		}
 	}
-	hs = append(hs, host)
-	m.hosts[host.host] = hs
 }
