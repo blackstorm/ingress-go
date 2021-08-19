@@ -6,31 +6,44 @@ import (
 	"github.com/blackstorm/ingress-go/pkg/controller/matcher"
 )
 
+type handler func(resp http.ResponseWriter, req *http.Request)
+
 type serverHandler struct {
-	matcher *matcher.RequestMatcher
+	matcher        *matcher.RequestMatcher
+	beforeHandlers []handler
+	afterHandlers  []handler
 }
 
 func newServerHandler(matcher *matcher.RequestMatcher) *serverHandler {
 	return &serverHandler{
-		matcher: matcher,
+		matcher:        matcher,
+		beforeHandlers: make([]handler, 0),
+		afterHandlers:  make([]handler, 0),
 	}
 }
 
 func (s *serverHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	// the head support for test
-	resp.Header().Add("alt-svc", "quic=\":443\"; ma=2592000; v=\"39\"")
+	s.doBefores(resp, req)
 	resp.Write([]byte("todo"))
-	/*
-		host := strings.Split(req.Host, ":")[0]
-		if routes, ok := s.hostsRoutes[host]; !ok {
-			resp.Write([]byte(fmt.Sprintf("TODO: no found host %s, is feedback no host backend", host)))
-		} else {
-			if route, ok := routes[req.URL.Path]; ok {
-				route.handleRequest(resp, req)
-			} else {
-				resp.WriteHeader(404)
-				resp.Write([]byte(fmt.Sprintf("host = %s path = %s not found", host, req.URL.Path)))
-			}
-		}
-	*/
+	s.doAfters(resp, req)
+}
+
+func (s *serverHandler) doBefores(resp http.ResponseWriter, req *http.Request) {
+	for _, hr := range s.beforeHandlers {
+		hr(resp, req)
+	}
+}
+
+func (s *serverHandler) doAfters(resp http.ResponseWriter, req *http.Request) {
+	for _, hr := range s.afterHandlers {
+		hr(resp, req)
+	}
+}
+
+func (s *serverHandler) addBeforeHandleRequest(hr handler) {
+	s.beforeHandlers = append(s.beforeHandlers, hr)
+}
+
+func (s *serverHandler) addAfterHandleRequest(hr handler) {
+	s.afterHandlers = append(s.afterHandlers, hr)
 }

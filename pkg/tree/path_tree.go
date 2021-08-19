@@ -6,19 +6,20 @@ import (
 
 // TODO use https://pkg.go.dev/golang.org/x/exp/utf8string for unicode support
 type PathTree struct {
+	path     string
 	value    interface{}
 	children map[string]*PathTree
 }
 
 func NewPathTree() *PathTree {
 	return &PathTree{
-		value:    nil,
 		children: make(map[string]*PathTree),
 	}
 }
 
-func newPathTree() *PathTree {
+func newPathTree(path string) *PathTree {
 	return &PathTree{
+		path:     path,
 		children: make(map[string]*PathTree),
 	}
 }
@@ -42,6 +43,7 @@ func treePaths(path string) []string {
 	return strings.Split(path, "/")
 }
 
+// The ingress path is validated
 func (t *PathTree) Put(path string, value interface{}) interface{} {
 	return t.put(treePaths(path), value)
 }
@@ -56,7 +58,7 @@ func (t *PathTree) put(paths []string, value interface{}) interface{} {
 
 	subPath := paths[1]
 	if t.children[subPath] == nil {
-		t.children[subPath] = newPathTree()
+		t.children[subPath] = newPathTree(subPath)
 	}
 
 	return t.children[subPath].put(paths[1:], value)
@@ -80,6 +82,17 @@ func (t *PathTree) prefixMatch(paths []string) interface{} {
 	return t.value
 }
 
-func (m *PathTree) Delete(path string) {
+func (t *PathTree) Delete(path string) {
+	t.delete(treePaths(path))
+}
 
+func (t *PathTree) delete(paths []string) {
+	if len(paths) == 1 {
+		t.value = nil
+		return
+	}
+
+	if tree := t.children[paths[1]]; tree != nil {
+		tree.delete(paths[1:])
+	}
 }

@@ -63,7 +63,7 @@ func (m *RequestMatcher) add(ingress *netv1.Ingress) {
 		}
 
 		// add and label
-		matcher.add(ingress, rule, host)
+		matcher.add(ingress, rule)
 	}
 }
 
@@ -77,8 +77,8 @@ func (m *RequestMatcher) delete(ingress *netv1.Ingress) {
 	klog.Info("delete ingress ", klog.KObj(ingress))
 	for _, rule := range ingress.Spec.Rules {
 		m.hostMatcher.delete(newHost(rule.Host, ingress))
-		if _, ok := m.hostPathMatcher[rule.Host]; ok {
-			// TODO
+		if pathMatcher := m.hostPathMatcher[rule.Host]; pathMatcher != nil {
+			pathMatcher.delete(rule)
 		}
 	}
 }
